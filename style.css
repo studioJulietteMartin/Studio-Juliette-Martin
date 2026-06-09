@@ -1,0 +1,184 @@
+:root {
+    --studio-weight: 300;
+    --studio-scale: 1;
+    --accent-volcano: #ff3333;
+    --accent-project: #ffffff;
+    --zoom-factor: 1;
+}
+
+body {
+    background-color: #0d0d0d;
+    color: #f0f0f0;
+    font-family: 'Courier New', Courier, monospace;
+    margin: 0;
+    min-height: 100vh;
+    width: 100vw;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    overflow-y: auto;
+    position: relative;
+}
+
+header {
+    position: absolute;
+    top: 25px; left: 60px; right: 60px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #555;
+    z-index: 100;
+    pointer-events: none;
+}
+
+.grid-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    transform: scale(calc(1 / var(--zoom-factor)));
+    transform-origin: center center;
+    background-image: 
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 50px 50px;
+    z-index: 1;
+}
+
+.map-frame {
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    pointer-events: none;
+    z-index: 4;
+}
+
+.axis-label {
+    position: absolute;
+    font-size: 8px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.34);
+    pointer-events: none;
+    z-index: 4;
+}
+.axis-lng-left  { top: 14px; left: 14px; transform: scale(calc(1 / var(--zoom-factor))); transform-origin: top left; }
+.axis-lng-right { top: 14px; right: 14px; text-align: right; transform: scale(calc(1 / var(--zoom-factor))); transform-origin: top right; }
+.axis-lat-top   { left: 14px; top: 50%; transform: translateY(-50%) rotate(-90deg) scale(calc(1 / var(--zoom-factor))); transform-origin: left center; }
+.axis-lat-bottom{ right: 14px; top: 50%; text-align: right; transform: translateY(-50%) rotate(90deg) scale(calc(1 / var(--zoom-factor))); transform-origin: right center; }
+
+.equator-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.16);
+    pointer-events: none;
+    z-index: 3;
+    transform: scale(calc(1 / var(--zoom-factor)));
+    transform-origin: center center;
+}
+
+.map-viewport {
+    position: absolute;
+    top: 60px; left: 60px; right: 60px; bottom: 100px;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.map-canvas {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    transform-origin: center center;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+main {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(var(--studio-scale));
+    text-align: center;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.activity-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: var(--accent-volcano);
+    border-radius: 50%;
+    z-index: 5;
+    cursor: pointer;
+    transform: translate(-50%, -50%) scale(calc(1 / var(--zoom-factor)));
+    box-shadow: 0 0 10px var(--accent-volcano);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.activity-dot::after {
+    content: '';
+    position: absolute;
+    top: -12px; left: -12px; right: -12px; bottom: -12px;
+    border: 1px solid var(--accent-volcano);
+    border-radius: 50%;
+    animation: shockwave 2.5s infinite linear;
+    opacity: 0;
+}
+
+@keyframes shockwave {
+    0% { transform: scale(0.2); opacity: 0.8; }
+    100% { transform: scale(2); opacity: 0; }
+}
+
+.project-marker {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    z-index: 6;
+    cursor: pointer;
+    transform: translate(-50%, -50%) scale(calc(1 / var(--zoom-factor)));
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.project-marker::before, .project-marker::after {
+    content: '';
+    position: absolute;
+    background-color: var(--accent-project);
+}
+.project-marker::before { top: 7px; left: 0; width: 16px; height: 2px; }
+.project-marker::after { left: 7px; top: 0; width: 2px; height: 16px; }
+
+.label {
+    position: absolute;
+    left: 22px;
+    top: 50%;
+    transform: translateY(-50%);
+    transform-origin: left center;
+    background: rgba(13, 13, 13, 0.95);
+    border: 1px solid #333;
+    padding: 6px 10px;
+    font-family: monospace;
+    font-size: 11px;
+    white-space: nowrap;
+    color: #aaa;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 1000;
+}
+.activity-dot:hover .label, .project-marker:hover .label { opacity: 1; }
+
+footer {
+    position: absolute;
+    bottom: 1.5rem; left: 60px; right: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-size: 0.85rem;
+    z-index: 10;
+    font-family: monospace;
+    color: #aaa;
+}
+.contact-data a {  text-decoration: none; font-family: sans-serif; }
+.zoom-indicator { font-size: 10px; color: #aaa; }
