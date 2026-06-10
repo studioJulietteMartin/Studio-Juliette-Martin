@@ -65,18 +65,18 @@ input[type="range"] { flex:1; cursor:pointer; min-width:0; accent-color:#555; }
 /* ── Canvas col ── */
 .canvas-col { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px 18px 10px; gap:8px; overflow:hidden; height:100vh; position:relative; }
 #err-box { position:absolute; top:10px; left:50%; transform:translateX(-50%); background:rgba(255,245,245,0.97); border:1px solid #f0c0c0; border-radius:5px; padding:6px 12px; font-size:10px; font-family:var(--mono); color:#b03030; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; display:none; z-index:10; }
-.canvas-wrap { position:relative; display:flex; align-items:center; justify-content:center; flex:1 1 auto; min-height:0; width:100%; }
+.canvas-wrap { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1 1 auto; min-height:0; width:100%; }
 canvas { display:block; background:#fff; border-radius:10px; border:1px solid var(--border); max-width:100%; max-height:100%; transition:filter 0.3s,opacity 0.3s; }
 canvas.loading { filter:blur(4px); opacity:0.45; }
 .loading-badge { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(255,255,255,0.94); border:1px solid var(--border); border-radius:6px; padding:8px 18px; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); font-weight:500; display:none; pointer-events:none; white-space:nowrap; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
 .loading-badge.visible { display:block; }
-.legend { display:flex; flex-wrap:wrap; gap:4px 14px; justify-content:center; width:100%; }
+.legend { display:flex; flex-wrap:wrap; gap:0px 14px; justify-content:center; width:100%; margin:15px; }
 .legend-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--faint); opacity:0.3; transition:opacity 0.15s; font-family:var(--mono); }
 .legend-item.active { opacity:1; color:var(--muted); }
 .legend-line { width:14px; border-radius:1px; flex-shrink:0; }
-.canvas-actions { display:flex; gap:6px; }
-.export-btn { font-family:inherit; font-size:10px; letter-spacing:0.07em; text-transform:uppercase; font-weight:500; background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:5px 12px; cursor:pointer; color:var(--muted); transition:all 0.12s; }
-.export-btn:hover { background:var(--border); }
+.canvas-actions { display:flex; gap:6px; margin-bottom:20px; }
+.export-btn { font-family:inherit; font-size:10px; letter-spacing:0.07em; text-transform:uppercase; font-weight:500; background:black; border:1px solid var(--border); border-radius:4px; padding:5px 12px; cursor:pointer; color:white; transition:all 0.12s; }
+.export-btn:hover { background:gray; }
 </style>
 </head>
 <body>
@@ -137,8 +137,8 @@ canvas.loading { filter:blur(4px); opacity:0.45; }
   <div class="canvas-wrap">
     <canvas id="chart"></canvas>
     <div class="loading-badge" id="loadingBadge">Loading data…</div>
+    <div class="legend" id="legend"></div>
   </div>
-  <div class="legend" id="legend"></div>
   <div class="canvas-actions">
     <button class="export-btn" id="btnPNG">↓ PNG</button>
     <button class="export-btn" id="btnSVG">↓ SVG</button>
