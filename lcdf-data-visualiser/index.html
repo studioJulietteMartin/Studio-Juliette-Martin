@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Chaux-de-Fonds — Climate</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:      #f4f3ef;
+  --surface: #ffffff;
+  --border:  #e2e0d8;
+  --border2: #d0cec6;
+  --text:    #1c1c1a;
+  --muted:   #888880;
+  --faint:   #b8b6ae;
+  --lsz:     9px;
+  --mono:    'JetBrains Mono','Fira Mono',monospace;
+}
+html, body { height:100%; overflow:hidden; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); font-size:13px; }
+.app { display:grid; grid-template-columns:264px 1fr; height:100vh; overflow:hidden; }
+
+/* ── Sidebar ── */
+.sidebar { background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.sidebar-header { padding:12px 14px 10px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.sidebar-header h1 { font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; }
+.sidebar-header p  { font-size:10px; color:var(--faint); margin-top:2px; letter-spacing:0.03em; }
+.sidebar-inner { flex:1; overflow-y:auto; padding:14px 13px 20px; display:flex; flex-direction:column; gap:16px; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+.sec-title { font-size:var(--lsz); letter-spacing:0.11em; text-transform:uppercase; font-weight:600; color:var(--faint); margin-bottom:7px; padding-bottom:4px; border-bottom:1px solid var(--border); }
+.ctrl-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.ctrl-row:last-child { margin-bottom:0; }
+.ctrl-label { font-size:11px; color:var(--muted); flex:0 0 86px; }
+select { font-size:11px; font-family:inherit; border:1px solid var(--border); border-radius:4px; background:var(--bg); color:var(--text); padding:3px 5px; cursor:pointer; outline:none; flex:1; }
+select:focus { border-color:var(--border2); }
+input[type="range"] { flex:1; cursor:pointer; min-width:0; accent-color:#555; }
+.range-val { font-size:10px; font-family:var(--mono); color:var(--muted); min-width:28px; text-align:right; }
+.vis-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.vis-btn { font-family:inherit; font-size:10px; letter-spacing:0.05em; text-transform:uppercase; font-weight:500; background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:5px 6px; cursor:pointer; color:var(--faint); transition:all 0.12s; text-align:center; }
+.vis-btn.active { background:var(--text); color:#fff; border-color:var(--text); }
+
+/* Dataset tabs */
+.dataset-tabs { display:flex; gap:4px; }
+.tab-btn { flex:1; font-family:inherit; font-size:10px; font-weight:500; letter-spacing:0.05em; text-transform:uppercase; padding:5px 4px; border:1px solid var(--border); border-radius:4px; background:var(--bg); color:var(--faint); cursor:pointer; text-align:center; transition:all 0.12s; }
+.tab-btn.active { background:var(--text); color:#fff; border-color:var(--text); }
+
+/* Layer rows */
+.layer-row { border:1px solid var(--border); border-radius:6px; overflow:hidden; transition:border-color 0.15s; margin-bottom:5px; }
+.layer-row:last-child { margin-bottom:0; }
+.layer-row.active { border-color:var(--border2); }
+.layer-header { display:flex; align-items:center; gap:7px; padding:6px 8px; cursor:pointer; user-select:none; background:var(--bg); }
+.layer-row.active .layer-header { background:#fafaf7; }
+.color-swatch { width:14px; height:14px; border-radius:2px; border:1px solid rgba(0,0,0,0.15); flex-shrink:0; cursor:pointer; position:relative; overflow:hidden; }
+.color-swatch input[type="color"] { position:absolute; inset:-4px; width:calc(100% + 8px); height:calc(100% + 8px); opacity:0; cursor:pointer; border:none; padding:0; }
+.layer-name { font-size:11px; font-weight:500; flex:1; color:var(--faint); transition:color 0.15s; }
+.layer-row.active .layer-name { color:var(--text); }
+.layer-note { font-size:9px; color:var(--faint); opacity:0.6; flex-shrink:0; }
+.toggle-pill { width:26px; height:14px; border-radius:7px; background:var(--border); border:none; cursor:pointer; position:relative; flex-shrink:0; transition:background 0.15s; }
+.toggle-pill::after { content:''; position:absolute; top:2px; left:2px; width:10px; height:10px; border-radius:50%; background:#fff; transition:transform 0.15s; box-shadow:0 1px 2px rgba(0,0,0,0.2); }
+.layer-row.active .toggle-pill { background:var(--text); }
+.layer-row.active .toggle-pill::after { transform:translateX(12px); }
+.layer-params { padding:7px 8px 9px; border-top:1px solid var(--border); background:var(--surface); opacity:0.28; pointer-events:none; transition:opacity 0.15s; display:flex; flex-direction:column; gap:5px; }
+.layer-row.active .layer-params { opacity:1; pointer-events:auto; }
+.param-label { font-size:var(--lsz); letter-spacing:0.08em; text-transform:uppercase; color:var(--faint); font-weight:500; margin-bottom:1px; }
+
+/* ── Canvas col ── */
+.canvas-col { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px 18px 10px; gap:8px; overflow:hidden; height:100vh; position:relative; }
+#err-box { position:absolute; top:10px; left:50%; transform:translateX(-50%); background:rgba(255,245,245,0.97); border:1px solid #f0c0c0; border-radius:5px; padding:6px 12px; font-size:10px; font-family:var(--mono); color:#b03030; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; display:none; z-index:10; }
+.canvas-wrap { position:relative; display:flex; align-items:center; justify-content:center; flex:1 1 auto; min-height:0; width:100%; }
+canvas { display:block; background:#fff; border-radius:10px; border:1px solid var(--border); max-width:100%; max-height:100%; transition:filter 0.3s,opacity 0.3s; }
+canvas.loading { filter:blur(4px); opacity:0.45; }
+.loading-badge { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(255,255,255,0.94); border:1px solid var(--border); border-radius:6px; padding:8px 18px; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); font-weight:500; display:none; pointer-events:none; white-space:nowrap; box-shadow:0 2px 12px rgba(0,0,0,0.06); }
+.loading-badge.visible { display:block; }
+.legend { display:flex; flex-wrap:wrap; gap:4px 14px; justify-content:center; width:100%; }
+.legend-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--faint); opacity:0.3; transition:opacity 0.15s; font-family:var(--mono); }
+.legend-item.active { opacity:1; color:var(--muted); }
+.legend-line { width:14px; border-radius:1px; flex-shrink:0; }
+.canvas-actions { display:flex; gap:6px; }
+.export-btn { font-family:inherit; font-size:10px; letter-spacing:0.07em; text-transform:uppercase; font-weight:500; background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:5px 12px; cursor:pointer; color:var(--muted); transition:all 0.12s; }
+.export-btn:hover { background:var(--border); }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ══ LEFT SIDEBAR ══ -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>La Chaux-de-Fonds</h1>
+    <p>Weekly averages · ERA5 + IPCC CMIP6 · 47.10°N 6.83°E</p>
+  </div>
+  <div class="sidebar-inner">
+
+    <div>
+      <div class="sec-title">Dataset</div>
+      <div class="dataset-tabs">
+        <button class="tab-btn active" data-di="0">2020s</button>
+        <button class="tab-btn" data-di="1">2030s proj.</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-title">Grid</div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Rings</span>
+        <input type="range" id="ringsSlider" min="2" max="12" step="1" value="5">
+        <span class="range-val" id="ringsVal">5</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Grid weight</span>
+        <input type="range" id="gridWSlider" min="0.1" max="2" step="0.1" value="0.5">
+        <span class="range-val" id="gridWVal">0.5</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-title">Visibility</div>
+      <div class="vis-grid">
+        <button class="vis-btn active" id="btnMonths">Months</button>
+        <button class="vis-btn active" id="btnGrid">Grid</button>
+        <button class="vis-btn active" id="btnDots">Dots</button>
+        <button class="vis-btn active" id="btnScaleNums">Scale #s</button>
+        <button class="vis-btn active" id="btnSource">Source</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-title">Layers</div>
+      <div id="layersContainer"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ RIGHT CANVAS ══ -->
+<div class="canvas-col">
+  <div id="err-box"></div>
+  <div class="canvas-wrap">
+    <canvas id="chart"></canvas>
+    <div class="loading-badge" id="loadingBadge">Loading data…</div>
+  </div>
+  <div class="legend" id="legend"></div>
+  <div class="canvas-actions">
+    <button class="export-btn" id="btnPNG">↓ PNG</button>
+    <button class="export-btn" id="btnSVG">↓ SVG</button>
+  </div>
+</div>
+
+</div>
+<script>
+const LAT=47.0996, LON=6.8260;
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_WEEK=[0,4,8,13,17,22,26,30,35,39,43,48];
+
+const DATASETS=[
+  { label:'2020s',        start:2020, end:2025, src:'archive' },
+  { label:'2030s (proj.)',start:2030, end:2039, src:'climate' },
+];
+
+const LAYERS=[
+  { id:'precip',   label:'Precipitation', unit:'mm',   color:'#3a7abf',
+    archiveVar:'precipitation_sum',   climateVar:'precipitation_sum',
+    type:'sum',  defaultMin:0,  defaultMax:40 },
+  { id:'wind',     label:'Wind speed',    unit:'km/h', color:'#2a8a5e',
+    archiveVar:'wind_speed_10m_max',  climateVar:'wind_speed_10m_max',
+    type:'mean', defaultMin:0,  defaultMax:60 },
+  { id:'snow',     label:'Snow cover',    unit:'cm',   color:'#6a8fa8',
+    archiveVar:'snow_depth', climateVar:null, hourly:true,
+    type:'mean', defaultMin:0,  defaultMax:50, noProj:true, note:'no proj.' },
+  { id:'temp',     label:'Temperature',   unit:'°C',   color:'#b85c30',
+    archiveVar:'temperature_2m_mean', climateVar:'temperature_2m_mean',
+    type:'mean', defaultMin:-5, defaultMax:25 },
+  { id:'sunshine', label:'Sunshine',      unit:'h',    color:'#b89a20',
+    archiveVar:'sunshine_duration',   climateVar:'shortwave_radiation_sum',
+    type:'sum',  defaultMin:0,  defaultMax:80,
+    divisor:3600, climateDivisor:0.277778, note:'proj.≈radiation' },
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+// layerDataSets[datasetIdx][layerId] = weekly array — cached separately per dataset
+const layerDataSets = [{}, {}];
+const cache         = {};
+
+// Per-layer visual settings — persist across dataset switches
+const layerActive   = {};
+const layerColor    = {};
+const layerMin      = {};
+const layerMax      = {};
+const layerWidth    = {};
+const layerDotSize  = {};
+
+let currentDsIdx = 0;
+let showMonths=true, showGrid=true, showDots=true, showScaleNums=true, showSource=true;
+
+// ── DOM ───────────────────────────────────────────────────────────────────────
+const canvas       = document.getElementById('chart');
+const ctx          = canvas.getContext('2d');
+const ringsSlider  = document.getElementById('ringsSlider');
+const ringsVal     = document.getElementById('ringsVal');
+const gridWSlider  = document.getElementById('gridWSlider');
+const gridWVal     = document.getElementById('gridWVal');
+const errBox       = document.getElementById('err-box');
+const loadingBadge = document.getElementById('loadingBadge');
+
+// ── Canvas sizing ─────────────────────────────────────────────────────────────
+function sizeCanvas() {
+  const wrap = canvas.parentElement;
+  const size = Math.min(wrap.clientWidth - 8, wrap.clientHeight - 8, window.innerHeight * 0.86);
+  canvas.width  = size;
+  canvas.height = size;
+  redraw();
+}
+window.addEventListener('resize', sizeCanvas);
+
+// ── Dataset tabs ──────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentDsIdx = parseInt(btn.dataset.di);
+    const needsFetch = LAYERS.some(l => layerActive[l.id] && !layerDataSets[currentDsIdx][l.id]);
+    if (needsFetch) fetchAndDraw();
+    else redraw();
+  });
+});
+
+// ── Build layer UI ────────────────────────────────────────────────────────────
+const layersContainer = document.getElementById('layersContainer');
+const legendEl        = document.getElementById('legend');
+
+LAYERS.forEach(layer => {
+  layerActive[layer.id]  = false;
+  layerColor[layer.id]   = layer.color;
+  layerMin[layer.id]     = layer.defaultMin;
+  layerMax[layer.id]     = layer.defaultMax;
+  layerWidth[layer.id]   = 1.5;
+  layerDotSize[layer.id] = 1.5;
+
+  const noteHtml = layer.note ? `<span class="layer-note">${layer.note}</span>` : '';
+
+  const row = document.createElement('div');
+  row.className = 'layer-row';
+  row.id = `row_${layer.id}`;
+  row.innerHTML = `
+    <div class="layer-header" id="hdr_${layer.id}">
+      <div class="color-swatch" id="sw_${layer.id}" style="background:${layer.color}">
+        <input type="color" id="clr_${layer.id}" value="${layer.color}">
+      </div>
+      <span class="layer-name">${layer.label}</span>
+      ${noteHtml}
+      <button class="toggle-pill" id="tog_${layer.id}" aria-label="Toggle ${layer.label}"></button>
+    </div>
+    <div class="layer-params">
+      <div>
+        <div class="param-label">Y min (${layer.unit})</div>
+        <div class="ctrl-row" style="margin:0">
+          <input type="range" id="mn_${layer.id}"
+            min="${layer.defaultMin - Math.abs(layer.defaultMax)}"
+            max="${layer.defaultMax}" step="0.5" value="${layer.defaultMin}">
+          <span class="range-val" id="mnv_${layer.id}">${layer.defaultMin}</span>
+        </div>
+      </div>
+      <div>
+        <div class="param-label">Y max (${layer.unit})</div>
+        <div class="ctrl-row" style="margin:0">
+          <input type="range" id="mx_${layer.id}"
+            min="1" max="${layer.defaultMax * 4}" step="0.5" value="${layer.defaultMax}">
+          <span class="range-val" id="mxv_${layer.id}">${layer.defaultMax}</span>
+        </div>
+      </div>
+      <div>
+        <div class="param-label">Line weight (px)</div>
+        <div class="ctrl-row" style="margin:0">
+          <input type="range" id="lw_${layer.id}" min="0.25" max="8" step="0.25" value="1.5">
+          <span class="range-val" id="lwv_${layer.id}">1.5</span>
+        </div>
+      </div>
+      <div>
+        <div class="param-label">Dot size (px)</div>
+        <div class="ctrl-row" style="margin:0">
+          <input type="range" id="ds_${layer.id}" min="0" max="6" step="0.25" value="1.5">
+          <span class="range-val" id="dsv_${layer.id}">1.5</span>
+        </div>
+      </div>
+    </div>`;
+  layersContainer.appendChild(row);
+
+  // Toggle
+  row.querySelector(`#tog_${layer.id}`).addEventListener('click', e => {
+    e.stopPropagation(); toggleLayer(layer.id);
+  });
+  row.querySelector(`#hdr_${layer.id}`).addEventListener('click', e => {
+    if (e.target.closest('.color-swatch')) return;
+    toggleLayer(layer.id);
+  });
+
+  // Color
+  const clrInput = row.querySelector(`#clr_${layer.id}`);
+  const swatch   = row.querySelector(`#sw_${layer.id}`);
+  clrInput.addEventListener('input', e => {
+    layerColor[layer.id] = e.target.value;
+    swatch.style.background = e.target.value;
+    const li = document.getElementById(`leg_${layer.id}`);
+    if (li) li.querySelector('.legend-line').style.background = e.target.value;
+    redraw();
+  });
+
+  // Y-min
+  row.querySelector(`#mn_${layer.id}`).addEventListener('input', e => {
+    layerMin[layer.id] = parseFloat(e.target.value);
+    row.querySelector(`#mnv_${layer.id}`).textContent = e.target.value;
+    redraw();
+  });
+
+  // Y-max
+  row.querySelector(`#mx_${layer.id}`).addEventListener('input', e => {
+    layerMax[layer.id] = parseFloat(e.target.value);
+    row.querySelector(`#mxv_${layer.id}`).textContent = e.target.value;
+    redraw();
+  });
+
+  // Line weight
+  row.querySelector(`#lw_${layer.id}`).addEventListener('input', e => {
+    layerWidth[layer.id] = parseFloat(e.target.value);
+    row.querySelector(`#lwv_${layer.id}`).textContent = e.target.value;
+    redraw();
+  });
+
+  // Dot size
+  row.querySelector(`#ds_${layer.id}`).addEventListener('input', e => {
+    layerDotSize[layer.id] = parseFloat(e.target.value);
+    row.querySelector(`#dsv_${layer.id}`).textContent = e.target.value;
+    redraw();
+  });
+
+  // Legend item
+  const li = document.createElement('div');
+  li.className = 'legend-item';
+  li.id = `leg_${layer.id}`;
+  li.innerHTML = `<span class="legend-line" style="background:${layer.color};height:2px;"></span>${layer.label} (${layer.unit})`;
+  legendEl.appendChild(li);
+});
+
+function toggleLayer(id) {
+  layerActive[id] = !layerActive[id];
+  document.getElementById(`row_${id}`).classList.toggle('active', layerActive[id]);
+  const li = document.getElementById(`leg_${id}`);
+  if (li) li.classList.toggle('active', layerActive[id]);
+  if (layerActive[id] && !layerDataSets[currentDsIdx][id]) fetchAndDraw();
+  else redraw();
+}
+
+// ── Visibility toggles ────────────────────────────────────────────────────────
+function setupVis(id, get, set) {
+  const b = document.getElementById(id);
+  b.addEventListener('click', () => { set(!get()); b.classList.toggle('active', get()); redraw(); });
+}
+setupVis('btnMonths',    () => showMonths,    v => { showMonths    = v; });
+setupVis('btnGrid',      () => showGrid,      v => { showGrid      = v; });
+setupVis('btnDots',      () => showDots,      v => { showDots      = v; });
+setupVis('btnScaleNums', () => showScaleNums, v => { showScaleNums = v; });
+setupVis('btnSource',    () => showSource,    v => { showSource    = v; });
+
+ringsSlider.addEventListener('input', () => { ringsVal.textContent = ringsSlider.value; redraw(); });
+gridWSlider.addEventListener('input', () => { gridWVal.textContent = gridWSlider.value; redraw(); });
+
+// ── Error / loading ───────────────────────────────────────────────────────────
+function showErr(msg) { errBox.style.display = 'block'; errBox.textContent = '⚠ ' + msg; }
+function clearErr()   { errBox.style.display = 'none'; }
+function setLoading(on) {
+  canvas.classList.toggle('loading', on);
+  loadingBadge.classList.toggle('visible', on);
+}
+
+// ── Week index ────────────────────────────────────────────────────────────────
+function weekIdx(dateStr, refYear) {
+  const d = new Date(dateStr), j = new Date(refYear, 0, 1);
+  return Math.min(Math.floor((d - j) / 86400000 / 7), 51);
+}
+
+// ── Aggregation ───────────────────────────────────────────────────────────────
+function aggWeekly(raw, dates, year, type, divisor) {
+  const w = Array(52).fill(0), c = Array(52).fill(0);
+  dates.forEach((d, i) => {
+    const wi = weekIdx(d, year), v = raw[i];
+    if (v != null && !isNaN(v)) { w[wi] += divisor ? v / divisor : v; c[wi]++; }
+  });
+  return w.map((s, i) => !c[i] ? 0 : parseFloat((type === 'mean' ? s / c[i] : s).toFixed(2)));
+}
+
+function aggHourlyWeekly(raw, dates, year) {
+  const w = Array(52).fill(0), c = Array(52).fill(0);
+  dates.forEach((d, i) => {
+    const wi = weekIdx(d.slice(0, 10), year), v = raw[i];
+    if (v != null && !isNaN(v)) { w[wi] += v; c[wi]++; }
+  });
+  return w.map((s, i) => !c[i] ? 0 : parseFloat((s / c[i]).toFixed(2)));
+}
+
+function avgWeeksAcross(raw, dates, sY, eY, type, divisor) {
+  const b = Array(52).fill(null).map(() => ({ s: 0, c: 0 }));
+  dates.forEach((d, i) => {
+    const y = parseInt(d.slice(0, 4));
+    if (y < sY || y > eY) return;
+    const wi = weekIdx(d, y), v = raw[i];
+    if (v != null && !isNaN(v)) { b[wi].s += divisor ? v / divisor : v; b[wi].c++; }
+  });
+  return b.map(({ s, c }) => !c ? 0 : parseFloat((type === 'mean' ? s / c : s / Math.max(c / 7, 1)).toFixed(2)));
+}
+
+// ── Fetch ─────────────────────────────────────────────────────────────────────
+async function fetchLayerForDs(layer, dsIdx) {
+  const ds = DATASETS[dsIdx];
+
+  if (ds.src === 'climate') {
+    if (layer.noProj || !layer.climateVar) return Array(52).fill(0);
+    const key = `clim_${layer.id}_${ds.start}`;
+    if (!cache[key]) {
+      const url = new URL('https://climate-api.open-meteo.com/v1/climate');
+      url.searchParams.set('latitude',   LAT);
+      url.searchParams.set('longitude',  LON);
+      url.searchParams.set('start_date', `${ds.start}-01-01`);
+      url.searchParams.set('end_date',   `${ds.end}-12-31`);
+      url.searchParams.set('daily',      layer.climateVar);
+      url.searchParams.set('models',     'MRI_AGCM3_2_S');
+      url.searchParams.set('timezone',   'Europe/Zurich');
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`Climate API HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.error) throw new Error(json.reason);
+      cache[key] = json;
+    }
+    const json = cache[key];
+    const vk  = layer.climateVar + '_MRI_AGCM3_2_S';
+    const raw  = json.daily[vk] || json.daily[layer.climateVar] || [];
+    return avgWeeksAcross(raw, json.daily.time || [], ds.start, ds.end,
+      layer.type, layer.climateDivisor || layer.divisor);
+  }
+
+  // Archive: fetch each year then average
+  const years = [];
+  for (let y = ds.start; y <= ds.end; y++) years.push(y);
+
+  const yearly = await Promise.all(years.map(async year => {
+    if (layer.hourly) {
+      const key = `h_${layer.archiveVar}_${year}`;
+      if (!cache[key]) {
+        const url = new URL('https://archive-api.open-meteo.com/v1/archive');
+        url.searchParams.set('latitude',   LAT);
+        url.searchParams.set('longitude',  LON);
+        url.searchParams.set('start_date', `${year}-01-01`);
+        url.searchParams.set('end_date',   `${year}-12-31`);
+        url.searchParams.set('hourly',     layer.archiveVar);
+        url.searchParams.set('timezone',   'Europe/Zurich');
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error(`HTTP ${res.status} (${year})`);
+        const json = await res.json();
+        if (json.error) throw new Error(json.reason);
+        cache[key] = json;
+      }
+      const json = cache[key];
+      const raw  = (json.hourly[layer.archiveVar] || []).map(v => v != null ? v * 100 : null);
+      return aggHourlyWeekly(raw, json.hourly.time || [], year);
+    } else {
+      const key = `d_${layer.archiveVar}_${year}`;
+      if (!cache[key]) {
+        const url = new URL('https://archive-api.open-meteo.com/v1/archive');
+        url.searchParams.set('latitude',   LAT);
+        url.searchParams.set('longitude',  LON);
+        url.searchParams.set('start_date', `${year}-01-01`);
+        url.searchParams.set('end_date',   `${year}-12-31`);
+        url.searchParams.set('daily',      layer.archiveVar);
+        url.searchParams.set('timezone',   'Europe/Zurich');
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error(`HTTP ${res.status} (${year})`);
+        const json = await res.json();
+        if (json.error) throw new Error(json.reason);
+        cache[key] = json;
+      }
+      const json = cache[key];
+      return aggWeekly(json.daily[layer.archiveVar] || [], json.daily.time || [], year, layer.type, layer.divisor);
+    }
+  }));
+
+  return Array(52).fill(0).map((_, w) => {
+    const vals = yearly.map(y => y[w]).filter(v => !isNaN(v));
+    return vals.length ? parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2)) : 0;
+  });
+}
+
+async function fetchAndDraw() {
+  clearErr();
+  setLoading(true);
+  const toFetch = LAYERS.filter(l => layerActive[l.id] && !layerDataSets[currentDsIdx][l.id]);
+  try {
+    await Promise.all(toFetch.map(async layer => {
+      layerDataSets[currentDsIdx][layer.id] = await fetchLayerForDs(layer, currentDsIdx);
+      // Auto-scale only if this is the very first time this layer loads (no data in any dataset)
+      const alreadyScaled = DATASETS.some((_, i) => i !== currentDsIdx && !!layerDataSets[i][layer.id]);
+      if (!alreadyScaled) autoScale(layer);
+    }));
+  } catch(e) {
+    showErr(e.message);
+  }
+  setLoading(false);
+  redraw();
+}
+
+function autoScale(layer) {
+  const data = layerDataSets[currentDsIdx][layer.id];
+  if (!data) return;
+  const vals = data.filter(v => !isNaN(v));
+  const peak = Math.max(...vals.map(Math.abs));
+  const minV = Math.min(...vals);
+  const auto = Math.ceil(peak * 1.25 / 5) * 5;
+  layerMax[layer.id] = Math.max(auto, 5);
+  layerMin[layer.id] = layer.id === 'temp' ? Math.floor(minV / 5) * 5 : layer.defaultMin;
+  const mx = document.getElementById(`mx_${layer.id}`);
+  const mn = document.getElementById(`mn_${layer.id}`);
+  if (mx) { mx.max = layerMax[layer.id] * 3; mx.value = layerMax[layer.id]; document.getElementById(`mxv_${layer.id}`).textContent = layerMax[layer.id]; }
+  if (mn) { mn.value = layerMin[layer.id]; document.getElementById(`mnv_${layer.id}`).textContent = layerMin[layer.id]; }
+}
+
+// ── Polar helpers ─────────────────────────────────────────────────────────────
+function valToR(val, mn, mx, R) {
+  if (mx <= mn) return 0;
+  return ((Math.max(mn, Math.min(mx, val)) - mn) / (mx - mn)) * R;
+}
+
+function polarPts(data, cx, cy, R, mn, mx) {
+  return data.map((val, i) => {
+    const angle = (i / data.length) * Math.PI * 2 - Math.PI / 2;
+    const r = valToR(val ?? 0, mn, mx, R);
+    return { x: cx + Math.cos(angle) * r, y: cy + Math.sin(angle) * r };
+  });
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────────
+function redraw() {
+  const W = canvas.width, H = canvas.height;
+  if (!W || !H) return;
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 52;
+  const rings  = parseInt(ringsSlider.value);
+  const gridW  = parseFloat(gridWSlider.value);
+  const dsData = layerDataSets[currentDsIdx];
+  const active = LAYERS.filter(l => layerActive[l.id] && dsData[l.id]);
+
+  ctx.clearRect(0, 0, W, H);
+
+  // ── Grid rings ──
+  if (showGrid) {
+    for (let r = 1; r <= rings; r++) {
+      const radius = (r / rings) * R;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = gridW;
+      ctx.stroke();
+    }
+  }
+
+  // ── Scale numbers: each active layer gets a dedicated radial axis ──
+  if (showGrid && showScaleNums && active.length > 0) {
+    active.forEach((layer, li) => {
+      const angle = (li / active.length) * Math.PI * 2 - Math.PI / 2;
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+
+      // Subtle colored axis line
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + cos * R, cy + sin * R);
+      ctx.strokeStyle = layerColor[layer.id];
+      ctx.globalAlpha = 0.2;
+      ctx.lineWidth = gridW;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Numbers at each ring, placed on the axis line
+      for (let r = 1; r <= rings; r++) {
+        const radius = (r / rings) * R;
+        const val = layerMin[layer.id] + (r / rings) * (layerMax[layer.id] - layerMin[layer.id]);
+        const lx = cx + cos * radius;
+        const ly = cy + sin * radius;
+        const label = Number.isInteger(val) ? String(val) : val.toFixed(1);
+        ctx.font = '8px "JetBrains Mono",monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        // White halo
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(label, lx, ly);
+        // Colored text
+        ctx.fillStyle = layerColor[layer.id];
+        ctx.globalAlpha = 0.8;
+        ctx.fillText(label, lx, ly);
+        ctx.globalAlpha = 1;
+      }
+
+      // Unit label at axis tip
+      const lx = cx + cos * (R + 16);
+      const ly = cy + sin * (R + 16);
+      ctx.font = 'bold 8px "JetBrains Mono",monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = layerColor[layer.id];
+      ctx.globalAlpha = 0.65;
+      ctx.fillText(layer.unit, lx, ly);
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  // ── Month spokes + labels ──
+  for (let m = 0; m < 12; m++) {
+    const angle = (MONTH_WEEK[m] / 52) * Math.PI * 2 - Math.PI / 2;
+    if (showGrid) {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(angle) * R, cy + Math.sin(angle) * R);
+      ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+      ctx.lineWidth = gridW;
+      ctx.stroke();
+    }
+    if (showMonths) {
+      const lx = cx + Math.cos(angle) * (R + 26);
+      const ly = cy + Math.sin(angle) * (R + 26);
+      ctx.fillStyle = 'rgba(0,0,0,0.38)';
+      ctx.font = '10px Inter,system-ui,sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(MONTHS[m], lx, ly);
+    }
+  }
+
+  // ── Data curves ──
+  active.forEach(layer => {
+    const data = dsData[layer.id];
+    const pts  = polarPts(data, cx, cy, R, layerMin[layer.id], layerMax[layer.id]);
+    const col  = layerColor[layer.id];
+    const lw   = layerWidth[layer.id];
+    const dr   = layerDotSize[layer.id];
+
+    ctx.beginPath();
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.closePath();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = lw;
+    ctx.stroke();
+
+    if (showDots && dr > 0) {
+      pts.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, dr, 0, Math.PI * 2);
+        ctx.fillStyle = col;
+        ctx.fill();
+      });
+    }
+
+    // Sync legend line weight & color
+    const li = document.getElementById(`leg_${layer.id}`);
+    if (li) {
+      const ll = li.querySelector('.legend-line');
+      if (ll) { ll.style.height = lw + 'px'; ll.style.background = col; }
+    }
+  });
+
+  // ── Source note ──
+  if (showSource) {
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.font = '8px "JetBrains Mono",monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`ERA5 / IPCC CMIP6 · Open-Meteo CC BY 4.0 · ${DATASETS[currentDsIdx].label}`, 10, H - 8);
+  }
+}
+
+// ── SVG export ────────────────────────────────────────────────────────────────
+function buildSVG() {
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 52;
+  const rings  = parseInt(ringsSlider.value);
+  const gridW  = parseFloat(gridWSlider.value);
+  const dsData = layerDataSets[currentDsIdx];
+  const active = LAYERS.filter(l => layerActive[l.id] && dsData[l.id]);
+
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="background:#fff;font-family:Inter,system-ui,sans-serif;">`;
+
+  if (showGrid) {
+    for (let r = 1; r <= rings; r++) {
+      const radius = (r / rings) * R;
+      s += `<circle cx="${cx}" cy="${cy}" r="${radius.toFixed(1)}" fill="none" stroke="rgba(0,0,0,0.08)" stroke-width="${gridW}"/>`;
+    }
+    if (showScaleNums) {
+      active.forEach((layer, li) => {
+        const angle = (li / active.length) * Math.PI * 2 - Math.PI / 2;
+        const cos = Math.cos(angle), sin = Math.sin(angle);
+        s += `<line x1="${cx}" y1="${cy}" x2="${(cx + cos * R).toFixed(1)}" y2="${(cy + sin * R).toFixed(1)}" stroke="${layerColor[layer.id]}" stroke-width="${gridW}" opacity="0.2"/>`;
+        for (let r = 1; r <= rings; r++) {
+          const radius = (r / rings) * R;
+          const val = layerMin[layer.id] + (r / rings) * (layerMax[layer.id] - layerMin[layer.id]);
+          const lx = (cx + cos * radius).toFixed(1);
+          const ly = (cy + sin * radius).toFixed(1);
+          const label = Number.isInteger(val) ? String(val) : val.toFixed(1);
+          s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-size="8" font-family="monospace" fill="${layerColor[layer.id]}" opacity="0.8" stroke="white" stroke-width="3" paint-order="stroke">${label}</text>`;
+        }
+        const lx = (cx + cos * (R + 16)).toFixed(1);
+        const ly = (cy + sin * (R + 16)).toFixed(1);
+        s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-size="8" font-family="monospace" font-weight="bold" fill="${layerColor[layer.id]}" opacity="0.65">${layer.unit}</text>`;
+      });
+    }
+  }
+
+  for (let m = 0; m < 12; m++) {
+    const angle = (MONTH_WEEK[m] / 52) * Math.PI * 2 - Math.PI / 2;
+    if (showGrid) {
+      s += `<line x1="${cx}" y1="${cy}" x2="${(cx + Math.cos(angle) * R).toFixed(1)}" y2="${(cy + Math.sin(angle) * R).toFixed(1)}" stroke="rgba(0,0,0,0.06)" stroke-width="${gridW}"/>`;
+    }
+    if (showMonths) {
+      const lx = (cx + Math.cos(angle) * (R + 26)).toFixed(1);
+      const ly = (cy + Math.sin(angle) * (R + 26)).toFixed(1);
+      s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-size="10" fill="rgba(0,0,0,0.38)">${MONTHS[m]}</text>`;
+    }
+  }
+
+  active.forEach(layer => {
+    const pts   = polarPts(dsData[layer.id], cx, cy, R, layerMin[layer.id], layerMax[layer.id]);
+    const ptStr = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const dr    = layerDotSize[layer.id];
+    s += `<polygon points="${ptStr}" fill="none" stroke="${layerColor[layer.id]}" stroke-width="${layerWidth[layer.id]}"/>`;
+    if (showDots && dr > 0) {
+      pts.forEach(p => {
+        s += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dr}" fill="${layerColor[layer.id]}"/>`;
+      });
+    }
+  });
+
+  if (showSource) {
+    s += `<text x="10" y="${H - 8}" font-size="8" font-family="monospace" fill="rgba(0,0,0,0.18)">ERA5/IPCC · Open-Meteo CC BY 4.0 · ${DATASETS[currentDsIdx].label}</text>`;
+  }
+  s += '</svg>';
+  return s;
+}
+
+document.getElementById('btnPNG').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = `lcdf_${DATASETS[currentDsIdx].label.replace(/\s/g, '_')}.png`;
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+});
+
+document.getElementById('btnSVG').addEventListener('click', () => {
+  const blob = new Blob([buildSVG()], { type: 'image/svg+xml' });
+  const a = document.createElement('a');
+  a.download = `lcdf_${DATASETS[currentDsIdx].label.replace(/\s/g, '_')}.svg`;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+sizeCanvas();
+</script>
+</body>
+</html>
