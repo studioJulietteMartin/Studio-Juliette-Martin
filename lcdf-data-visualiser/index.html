@@ -140,12 +140,15 @@ canvas.loading { filter:blur(4px); opacity:0.45; }
     <div class="legend" id="legend"></div>
   </div>
   <div class="canvas-actions">
-    <button class="export-btn" id="btnPNG">↓ PNG</button>
-    <button class="export-btn" id="btnSVG">↓ SVG</button>
+    <button class="export-btn" id="btnPNG">↓ PNG - ALL LAYERS</button>
+        <button class="export-btn" id="btnSeparatePNG">↓ PNG - Layers separate</button>
+    <button class="export-btn" id="btnSVG">↓ SVG - ALL LAYERS</button>
+    <button class="export-btn" id="btnSeparateSVG">↓ SVG - Layers separate</button>
   </div>
 </div>
 
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 const LAT=47.0996, LON=6.8260;
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -179,6 +182,14 @@ const LAYERS=[
 // layerDataSets[datasetIdx][layerId] = weekly array — cached separately per dataset
 const layerDataSets = [{}, {}];
 const cache         = {};
+
+function todayStamp() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}`;
+}
 
 // Per-layer visual settings — persist across dataset switches
 const layerActive   = {};
@@ -741,7 +752,7 @@ function buildSVG() {
 
 document.getElementById('btnPNG').addEventListener('click', () => {
   const a = document.createElement('a');
-  a.download = `lcdf_${DATASETS[currentDsIdx].label.replace(/\s/g, '_')}.png`;
+  a.download = `lcdf_${todayStamp()}_${DATASETS[currentDsIdx].label.replace(/\s/g, '_')}.png`;
   a.href = canvas.toDataURL('image/png');
   a.click();
 });
@@ -749,10 +760,245 @@ document.getElementById('btnPNG').addEventListener('click', () => {
 document.getElementById('btnSVG').addEventListener('click', () => {
   const blob = new Blob([buildSVG()], { type: 'image/svg+xml' });
   const a = document.createElement('a');
-  a.download = `lcdf_${DATASETS[currentDsIdx].label.replace(/\s/g, '_')}.svg`;
+  a.download = `lcdf_${todayStamp()}_${DATASETS[currentDsIdx].label.replace(/\s/g, '_')}.svg`;
   a.href = URL.createObjectURL(blob);
   a.click();
 });
+
+// ── Export: each layer + grid + scale + annotations as SEPARATE files ─────────
+// Produces one PNG and one SVG per active layer, plus dedicated grid /
+// scale-numbers / annotations (months + source) files — all on a transparent
+// background so they stack cleanly in Illustrator.
+
+function downloadCanvasAsPNG(drawFn, filename) {
+  const W = canvas.width, H = canvas.height;
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const offCtx = off.getContext('2d');
+  drawFn(offCtx, W, H);
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = off.toDataURL('image/png');
+  a.click();
+}
+
+function downloadSVGString(svgStr, filename) {
+  const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+  const a = document.createElement('a');
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+}
+
+function geom() {
+  const W = canvas.width, H = canvas.height;
+  return { W, H, cx: W / 2, cy: H / 2, R: Math.min(W, H) / 2 - 52 };
+}
+
+// -- 1. Grid only (rings + month spokes, no numbers, no curves) --
+function drawGridOnly(c, W, H) {
+  const { cx, cy, R } = geom();
+  const rings = parseInt(ringsSlider.value);
+  const gridW = parseFloat(gridWSlider.value);
+  c.clearRect(0, 0, W, H);
+  for (let r = 1; r <= rings; r++) {
+    const radius = (r / rings) * R;
+    c.beginPath(); c.arc(cx, cy, radius, 0, Math.PI * 2);
+    c.strokeStyle = 'rgba(0,0,0,0.08)'; c.lineWidth = gridW; c.stroke();
+  }
+  for (let m = 0; m < 12; m++) {
+    const angle = (MONTH_WEEK[m] / 52) * Math.PI * 2 - Math.PI / 2;
+    c.beginPath(); c.moveTo(cx, cy);
+    c.lineTo(cx + Math.cos(angle) * R, cy + Math.sin(angle) * R);
+    c.strokeStyle = 'rgba(0,0,0,0.06)'; c.lineWidth = gridW; c.stroke();
+  }
+}
+function svgGridOnly() {
+  const { W, H, cx, cy, R } = geom();
+  const rings = parseInt(ringsSlider.value);
+  const gridW = parseFloat(gridWSlider.value);
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">`;
+  for (let r = 1; r <= rings; r++) {
+    const radius = (r / rings) * R;
+    s += `<circle cx="${cx}" cy="${cy}" r="${radius.toFixed(1)}" fill="none" stroke="rgba(0,0,0,0.08)" stroke-width="${gridW}"/>`;
+  }
+  for (let m = 0; m < 12; m++) {
+    const angle = (MONTH_WEEK[m] / 52) * Math.PI * 2 - Math.PI / 2;
+    s += `<line x1="${cx}" y1="${cy}" x2="${(cx + Math.cos(angle) * R).toFixed(1)}" y2="${(cy + Math.sin(angle) * R).toFixed(1)}" stroke="rgba(0,0,0,0.06)" stroke-width="${gridW}"/>`;
+  }
+  s += '</svg>';
+  return s;
+}
+
+// -- 2. Scale numbers only (per-layer radial axes + numbers + unit labels) --
+function drawScaleOnly(c, W, H) {
+  const { cx, cy, R } = geom();
+  const rings  = parseInt(ringsSlider.value);
+  const gridW  = parseFloat(gridWSlider.value);
+  const dsData = layerDataSets[currentDsIdx];
+  const active = LAYERS.filter(l => layerActive[l.id] && dsData[l.id]);
+  c.clearRect(0, 0, W, H);
+  if (active.length === 0) return;
+  active.forEach((layer, li) => {
+    const angle = (li / active.length) * Math.PI * 2 - Math.PI / 2;
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    c.beginPath(); c.moveTo(cx, cy);
+    c.lineTo(cx + cos * R, cy + sin * R);
+    c.strokeStyle = layerColor[layer.id]; c.globalAlpha = 0.2; c.lineWidth = gridW; c.stroke();
+    c.globalAlpha = 1;
+    for (let r = 1; r <= rings; r++) {
+      const radius = (r / rings) * R;
+      const val = layerMin[layer.id] + (r / rings) * (layerMax[layer.id] - layerMin[layer.id]);
+      const lx = cx + cos * radius, ly = cy + sin * radius;
+      const label = Number.isInteger(val) ? String(val) : val.toFixed(1);
+      c.font = '8px "JetBrains Mono",monospace';
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 3;
+      c.strokeText(label, lx, ly);
+      c.fillStyle = layerColor[layer.id]; c.globalAlpha = 0.8;
+      c.fillText(label, lx, ly); c.globalAlpha = 1;
+    }
+    const lx = cx + cos * (R + 16), ly = cy + sin * (R + 16);
+    c.font = 'bold 8px "JetBrains Mono",monospace';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = layerColor[layer.id]; c.globalAlpha = 0.65;
+    c.fillText(layer.unit, lx, ly); c.globalAlpha = 1;
+  });
+}
+function svgScaleOnly() {
+  const { W, H, cx, cy, R } = geom();
+  const rings  = parseInt(ringsSlider.value);
+  const gridW  = parseFloat(gridWSlider.value);
+  const dsData = layerDataSets[currentDsIdx];
+  const active = LAYERS.filter(l => layerActive[l.id] && dsData[l.id]);
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" font-family="monospace">`;
+  active.forEach((layer, li) => {
+    const angle = (li / active.length) * Math.PI * 2 - Math.PI / 2;
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    s += `<line x1="${cx}" y1="${cy}" x2="${(cx + cos * R).toFixed(1)}" y2="${(cy + sin * R).toFixed(1)}" stroke="${layerColor[layer.id]}" stroke-width="${gridW}" opacity="0.2"/>`;
+    for (let r = 1; r <= rings; r++) {
+      const radius = (r / rings) * R;
+      const val = layerMin[layer.id] + (r / rings) * (layerMax[layer.id] - layerMin[layer.id]);
+      const lx = (cx + cos * radius).toFixed(1), ly = (cy + sin * radius).toFixed(1);
+      const label = Number.isInteger(val) ? String(val) : val.toFixed(1);
+      s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-size="8" fill="${layerColor[layer.id]}" opacity="0.8" stroke="white" stroke-width="3" paint-order="stroke">${label}</text>`;
+    }
+    const lx = (cx + cos * (R + 16)).toFixed(1), ly = (cy + sin * (R + 16)).toFixed(1);
+    s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-size="8" font-weight="bold" fill="${layerColor[layer.id]}" opacity="0.65">${layer.unit}</text>`;
+  });
+  s += '</svg>';
+  return s;
+}
+
+// -- 3. Annotations only (month labels + source note, no grid lines) --
+function drawAnnotationsOnly(c, W, H) {
+  const { cx, cy, R } = geom();
+  c.clearRect(0, 0, W, H);
+  for (let m = 0; m < 12; m++) {
+    const angle = (MONTH_WEEK[m] / 52) * Math.PI * 2 - Math.PI / 2;
+    const lx = cx + Math.cos(angle) * (R + 26), ly = cy + Math.sin(angle) * (R + 26);
+    c.fillStyle = 'rgba(0,0,0,0.38)'; c.font = '10px Inter,system-ui,sans-serif';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(MONTHS[m], lx, ly);
+  }
+  c.fillStyle = 'rgba(0,0,0,0.18)'; c.font = '8px "JetBrains Mono",monospace';
+  c.textAlign = 'left'; c.textBaseline = 'bottom';
+  c.fillText(`ERA5 / IPCC CMIP6 · Open-Meteo CC BY 4.0 · ${DATASETS[currentDsIdx].label}`, 10, H - 8);
+}
+function svgAnnotationsOnly() {
+  const { W, H, cx, cy, R } = geom();
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">`;
+  for (let m = 0; m < 12; m++) {
+    const angle = (MONTH_WEEK[m] / 52) * Math.PI * 2 - Math.PI / 2;
+    const lx = (cx + Math.cos(angle) * (R + 26)).toFixed(1), ly = (cy + Math.sin(angle) * (R + 26)).toFixed(1);
+    s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" font-size="10" font-family="Inter,system-ui,sans-serif" fill="rgba(0,0,0,0.38)">${MONTHS[m]}</text>`;
+  }
+  s += `<text x="10" y="${H - 8}" font-size="8" font-family="monospace" fill="rgba(0,0,0,0.18)">ERA5/IPCC · Open-Meteo CC BY 4.0 · ${DATASETS[currentDsIdx].label}</text>`;
+  s += '</svg>';
+  return s;
+}
+
+// -- 4. Each active layer's curve alone (no grid, no other layers) --
+function drawSingleLayer(c, W, H, layer) {
+  const { cx, cy, R } = geom();
+  const dsData = layerDataSets[currentDsIdx];
+  const data = dsData[layer.id];
+  c.clearRect(0, 0, W, H);
+  if (!data) return;
+  const pts = polarPts(data, cx, cy, R, layerMin[layer.id], layerMax[layer.id]);
+  const col = layerColor[layer.id], lw = layerWidth[layer.id], dr = layerDotSize[layer.id];
+  c.beginPath();
+  pts.forEach((p, i) => i === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
+  c.closePath();
+  c.strokeStyle = col; c.lineWidth = lw; c.stroke();
+  if (showDots && dr > 0) {
+    pts.forEach(p => { c.beginPath(); c.arc(p.x, p.y, dr, 0, Math.PI * 2); c.fillStyle = col; c.fill(); });
+  }
+}
+function svgSingleLayer(layer) {
+  const { W, H, cx, cy, R } = geom();
+  const dsData = layerDataSets[currentDsIdx];
+  const data = dsData[layer.id];
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">`;
+  if (data) {
+    const pts = polarPts(data, cx, cy, R, layerMin[layer.id], layerMax[layer.id]);
+    const ptStr = pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const dr = layerDotSize[layer.id];
+    s += `<polygon points="${ptStr}" fill="none" stroke="${layerColor[layer.id]}" stroke-width="${layerWidth[layer.id]}"/>`;
+    if (showDots && dr > 0) {
+      pts.forEach(p => { s += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dr}" fill="${layerColor[layer.id]}"/>`; });
+    }
+  }
+  s += '</svg>';
+  return s;
+}
+
+// -- Orchestrators: PNG-only and SVG-only batches --
+async function exportLayersSeparateZip(format) {
+  const dsData = layerDataSets[currentDsIdx];
+  const active = LAYERS.filter(l => layerActive[l.id] && dsData[l.id]);
+  const dsLabel = `${todayStamp()}_${DATASETS[currentDsIdx].label.replace(/\s/g, '_')}`;
+
+  if (active.length === 0) {
+    showErr('Turn on at least one layer before exporting separate files.');
+    return;
+  }
+
+  const zip = new JSZip();
+
+  if (format === 'png') {
+    const addPNG = (drawFn, name) => {
+      const W = canvas.width, H = canvas.height;
+      const off = document.createElement('canvas');
+      off.width = W; off.height = H;
+      drawFn(off.getContext('2d'), W, H);
+      const dataUrl = off.toDataURL('image/png').split(',')[1]; // strip "data:image/png;base64,"
+      zip.file(name, dataUrl, { base64: true });
+    };
+    addPNG(drawGridOnly, `${dsLabel}_grid.png`);
+    addPNG(drawScaleOnly, `${dsLabel}_scale.png`);
+    addPNG(drawAnnotationsOnly, `${dsLabel}_annotations.png`);
+    active.forEach(layer => {
+      addPNG((c, W, H) => drawSingleLayer(c, W, H, layer), `${dsLabel}_${layer.id}.png`);
+    });
+  } else {
+    zip.file(`${dsLabel}_grid.svg`, svgGridOnly());
+    zip.file(`${dsLabel}_scale.svg`, svgScaleOnly());
+    zip.file(`${dsLabel}_annotations.svg`, svgAnnotationsOnly());
+    active.forEach(layer => {
+      zip.file(`${dsLabel}_${layer.id}.svg`, svgSingleLayer(layer));
+    });
+  }
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.download = `lcdf_${dsLabel}_layers_${format}.zip`;
+  a.href = URL.createObjectURL(blob);
+  a.click();
+}
+
+document.getElementById('btnSeparatePNG').addEventListener('click', () => exportLayersSeparateZip('png'));
+document.getElementById('btnSeparateSVG').addEventListener('click', () => exportLayersSeparateZip('svg'));
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 sizeCanvas();
