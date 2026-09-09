@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>ALICE Y1 — Material Landscapes / Îles — 2026/2027</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="stage">
+  <div id="pan">
+    <div id="zoom">
+      <picture>
+        <!-- Phones get the 2400px sheet: the 4081px one decodes to 66MB
+             of memory, which Safari will drop on older devices. -->
+        <source media="(max-width: 820px)" srcset="alice-wheel-2400.jpg">
+        <img id="disc" src="alice-wheel.jpg"
+             alt="ALICE Y1 2026/2027 programme wheel" draggable="false" decoding="async">
+      </picture>
+    </div>
+    <div id="hand" aria-hidden="true"></div>
+    <div id="hub" aria-hidden="true"></div>
+  </div>
+</div>
+
+<div id="controls">
+  <div id="tools">
+    <div class="group" role="group" aria-label="Pivot position">
+      <button class="anchor" data-anchor="left" title="Spring semester, pivot on the left edge" aria-label="Spring semester, pivot on the left edge">
+        <svg viewBox="0 0 24 18"><rect x="1.5" y="1.5" width="21" height="15" fill="none"/><circle cx="1.5" cy="9" r="3"/></svg>
+      </button>
+      <button class="anchor" data-anchor="bottom" title="Whole year, pivot on the bottom edge" aria-label="Whole year, pivot on the bottom edge">
+        <svg viewBox="0 0 24 18"><rect x="1.5" y="1.5" width="21" height="15" fill="none"/><circle cx="12" cy="16.5" r="3"/></svg>
+      </button>
+      <button class="anchor" data-anchor="right" title="Autumn semester, pivot on the right edge" aria-label="Autumn semester, pivot on the right edge">
+        <svg viewBox="0 0 24 18"><rect x="1.5" y="1.5" width="21" height="15" fill="none"/><circle cx="22.5" cy="9" r="3"/></svg>
+      </button>
+    </div>
+
+    <div class="group" role="group" aria-label="Zoom">
+      <button id="zoom-out" title="Zoom out" aria-label="Zoom out">–</button>
+      <output id="zoom-level">100</output>
+      <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+    </div>
+
+    <a id="pdf"
+       href="https://epflch.sharepoint.com/:b:/r/sites/ALICE_STUDENTS-y1_2026-27/Documents%20partages/y1_2026-27/01_STUDIO-NIVA/00_RESSOURCES/01_PROGRAMME/ALICE_Prog_2026_27_PF__JTV%201.pdf?d=wa568b5a4094c4830a36513033ce9231e&amp;csf=1&amp;web=1&amp;e=dnx9rF"
+       target="_blank" rel="noopener">Programme PDF</a>
+  </div>
+
+  <p id="title">ALICE Y1 &nbsp;Material Landscapes / Îles</p>
+</div>
+
+<p id="hint">Drag to turn · scroll or pinch to zoom · drag along the hand to reach the outer rings</p>
+
+<script src="wheel.js"></script>
+</body>
+</html>

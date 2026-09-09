@@ -1,0 +1,237 @@
+:root{
+  --ink:#000;
+  --paper:#fff;
+  --rule:1px;
+  --gutter:14px;
+  --safe-l:max(var(--gutter), env(safe-area-inset-left));
+  --safe-r:max(var(--gutter), env(safe-area-inset-right));
+  --safe-b:max(var(--gutter), env(safe-area-inset-bottom));
+}
+
+*{box-sizing:border-box}
+
+html,body{
+  height:100%;
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  overflow:hidden;
+  overscroll-behavior:none;
+  touch-action:manipulation;
+  font:400 12px/1.35 "Courier New",Courier,"Nimbus Mono PS",monospace;
+  -webkit-text-size-adjust:100%;
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* Locks the page against iOS rubber-banding behind the wheel. */
+body{position:fixed;inset:0;width:100%}
+
+/* ---------- stage ---------- */
+
+#stage{
+  position:fixed;
+  inset:0;
+  overflow:hidden;
+  background:var(--paper);
+  cursor:grab;
+  touch-action:none;
+}
+#stage.dragging{cursor:grabbing}
+#stage.sliding{cursor:move}
+
+/* #pan sits exactly on the hub; it has no size of its own, so every
+   child is positioned relative to the centre of the dial. */
+#pan{
+  position:absolute;
+  left:0; top:0;
+  width:0; height:0;
+  will-change:transform;
+}
+
+#zoom{
+  position:absolute;
+  left:0; top:0;
+  width:0; height:0;
+  will-change:transform;
+}
+
+#disc{
+  position:absolute;
+  left:0; top:0;
+  user-select:none;
+  -webkit-user-drag:none;
+  will-change:transform;
+}
+
+/* ---------- the hand ---------- */
+
+#hand{
+  position:absolute;
+  left:0; top:0;
+  height:9px;
+  margin-top:-4.5px;
+  background:var(--ink);
+  transform-origin:0 50%;
+  /* 5.4px at the hub, tapering to a hairline at the tip */
+  clip-path:polygon(0 20%, 100% 47.2%, 100% 52.8%, 0 80%);
+  filter:drop-shadow(0 0 1.5px rgba(255,255,255,.95))
+         drop-shadow(0 0 3px rgba(255,255,255,.7));
+  pointer-events:none;
+}
+
+#hub{
+  position:absolute;
+  left:-9px; top:-9px;
+  width:18px; height:18px;
+  border-radius:50%;
+  background:var(--paper);
+  border:1.5px solid var(--ink);
+  pointer-events:none;
+}
+
+/* ---------- chrome ---------- */
+
+#controls{
+  position:fixed;
+  left:var(--safe-l);
+  bottom:var(--safe-b);
+  right:var(--safe-r);
+  display:flex;
+  flex-wrap:wrap-reverse;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:10px 16px;
+  z-index:10;
+}
+
+/* The buttons stay together; the PDF sits with them and wraps with them. */
+#tools{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:10px;
+}
+
+.group{
+  display:flex;
+  border:var(--rule) solid var(--ink);
+  background:var(--paper);
+}
+
+button,
+#zoom-level{
+  appearance:none;
+  font:inherit;
+  color:var(--ink);
+  background:var(--paper);
+  border:0;
+  padding:0;
+  margin:0;
+}
+
+.group > * + *{border-left:var(--rule) solid var(--ink)}
+
+.group button{
+  width:32px; height:28px;
+  display:grid;
+  place-items:center;
+  cursor:pointer;
+  font-size:16px;
+  line-height:1;
+}
+
+.anchor svg{width:20px;height:15px;stroke:var(--ink);stroke-width:1.2;fill:var(--ink)}
+
+#zoom-level{
+  min-width:48px;
+  display:grid;
+  place-items:center;
+  font-variant-numeric:tabular-nums;
+}
+
+#pdf{
+  display:grid;
+  place-items:center;
+  border:var(--rule) solid var(--ink);
+  background:var(--paper);
+  color:var(--ink);
+  padding:0 12px;
+  height:28px;
+  text-decoration:none;
+  letter-spacing:.04em;
+  white-space:nowrap;
+}
+
+.group button:hover,
+#pdf:hover{background:var(--ink);color:var(--paper)}
+.group button:hover svg{stroke:var(--paper);fill:var(--paper)}
+.group button[aria-pressed="true"]{background:var(--ink)}
+.group button[aria-pressed="true"] svg{stroke:var(--paper);fill:var(--paper)}
+
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+/* ---------- title ---------- */
+
+/* Set like the buttons: same box, same height, no border on the left so
+   it reads as a label rather than something to press. */
+#title{
+  display:grid;
+  place-items:center;
+  margin:0;
+  height:28px;
+  padding:0 12px;
+  border:var(--rule) solid var(--ink);
+  background:var(--paper);
+  letter-spacing:.04em;
+  white-space:nowrap;
+}
+
+/* ---------- hint ---------- */
+
+#hint{
+  position:fixed;
+  right:var(--safe-r);
+  top:var(--gutter);
+  margin:0;
+  z-index:10;
+  background:var(--paper);
+  padding:2px 0 2px 8px;
+  transition:opacity .4s;
+}
+#hint.gone{opacity:0}
+
+/* ---------- small screens ---------- */
+
+@media (max-width:900px){
+  #hint{display:none}
+  #controls{gap:8px 12px}
+}
+
+@media (max-width:560px){
+  :root{--gutter:10px}
+  #title{font-size:11px;padding:0 8px;letter-spacing:0}
+}
+
+/* Finger-sized targets on touch devices. */
+@media (pointer:coarse){
+  .group button{width:42px;height:40px}
+  #pdf,#title{height:40px;padding:0 14px}
+  #zoom-level{min-width:52px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  #hint{transition:none}
+}
+
+/* Crosshair marking the point zoom holds still. Toggled with D while
+   tuning the VIEW block in wheel.js; invisible otherwise. */
+#focus-marker{
+  position:fixed;
+  width:0; height:0;
+  z-index:20;
+  pointer-events:none;
+}
+#focus-marker span{position:absolute;background:#e5006d}
+#focus-marker span:first-child{left:-22px;top:-0.5px;width:44px;height:1px}
+#focus-marker span:last-child{top:-22px;left:-0.5px;height:44px;width:1px}
