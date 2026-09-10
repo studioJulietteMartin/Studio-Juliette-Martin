@@ -6,16 +6,16 @@
      ================================================================== */
 
   // The dial's centre inside the image, as an offset from the middle of
-  // the image, in fractions of its width. The sheet is 4081 x 4081 but
-  // the hub sits at (2035.5, 2056) -- about 15px low.
-  const HUB_FX = -0.0012252;
-  const HUB_FY =  0.0037981;
+  // the image, in fractions of its width. The sheet is 4079 x 4079 but
+  // the hub sits at (2034.2, 2057.2) -- about 18px low and 5px left.
+  const HUB_FX = -0.0012993;
+  const HUB_FY =  0.0043393;
 
   // The 52 printed radial rules, in degrees clockwise from twelve
-  // o'clock on the dial. Every 6.9197deg starting at 0.091deg; no
-  // printed line is more than 0.14deg off this.
-  const STEP = 6.91971;
-  const OFFSET = 0.091;
+  // o'clock on the dial. Every 6.9224deg starting at 0.022deg; no
+  // printed line is more than 0.15deg off this.
+  const STEP = 6.92240;
+  const OFFSET = 0.0218;
   const WEEK  = Array.from({ length: 52 }, (_, i) => (OFFSET + i * STEP) % 360);
 
   // The subset drawn thick: the month boundaries.
@@ -600,6 +600,25 @@
     }
     e.preventDefault();
     hideHint();
+  });
+
+  /* ---------- the programme PDF, both sheets at once ---------- */
+
+  const pdfBtn = document.getElementById('pdf');
+  pdfBtn.addEventListener('click', () => {
+    const files = pdfBtn.dataset.pdf.split(',');
+    files.forEach((file, i) => {
+      // Browsers throttle downloads fired in the same tick, so they are
+      // spaced out; without the gap most of them keep only the first.
+      setTimeout(() => {
+        const a = document.createElement('a');
+        a.href = file.trim();
+        a.download = file.trim().split('/').pop();
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }, i * 600);
+    });
   });
 
   document.querySelectorAll('.anchor').forEach(b =>

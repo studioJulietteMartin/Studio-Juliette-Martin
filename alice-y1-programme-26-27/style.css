@@ -153,12 +153,12 @@ button,
 #pdf{
   display:grid;
   place-items:center;
+  cursor:pointer;
   border:var(--rule) solid var(--ink);
   background:var(--paper);
   color:var(--ink);
   padding:0 12px;
   height:28px;
-  text-decoration:none;
   letter-spacing:.04em;
   white-space:nowrap;
 }
